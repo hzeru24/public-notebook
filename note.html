@@ -1,20 +1,98 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Note - Public Notebook</title><link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Note - Public Notebook</title>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body data-page="note">
-<header class="topbar"><button class="icon-button" id="topics-toggle">☰</button><a class="brand" href="index.html">PUBLIC NOTEBOOK</a><div class="topbar-right"><span id="auth-label"></span><a class="small-button" id="auth-button" href="login.html">LOGIN</a></div></header>
+<header class="topbar">
+  <button class="icon-button" id="topics-toggle">☰</button>
+  <a class="brand" href="index.html">PUBLIC NOTEBOOK</a>
+  <div class="topbar-right">
+    <span id="auth-label"></span>
+    <a class="small-button" id="auth-button" href="login.html">LOGIN</a>
+  </div>
+</header>
+
 <div class="layout">
-  <aside class="sidebar" id="topic-sidebar"><div class="panel-heading"><span>TOPICS</span><button class="close-button" id="topics-close">×</button></div><a class="general-link" href="topic.html?id=general">★ GENERAL</a><div class="sidebar-subheading">COMMUNITY TOPICS</div><div id="topic-list" class="topic-list"></div><div class="pagination compact" id="topic-pagination"></div><div id="progress-box" class="progress-box"></div></aside>
+  <aside class="sidebar" id="topic-sidebar">
+    <div class="panel-heading">
+      <span>TOPICS</span>
+      <button class="close-button" id="topics-close">×</button>
+    </div>
+
+    <a class="general-link" href="topic.html?id=general">★ GENERAL</a>
+
+    <div class="sidebar-subheading">COMMUNITY TOPICS</div>
+    <div id="topic-list" class="topic-list"></div>
+    <div class="pagination compact" id="topic-pagination"></div>
+    <div id="progress-box" class="progress-box"></div>
+  </aside>
+
   <main class="content-column single-note-column">
     <a class="back-link" id="back-topic" href="index.html">← BACK TO TOPIC</a>
-    <article id="note" class="full-note"><div class="status">Loading note...</div></article>
+
+    <article id="note" class="full-note">
+      <div class="status">Loading note...</div>
+    </article>
+
+    <section class="comments-section" aria-labelledby="comments-heading">
+      <div class="comments-divider"></div>
+
+      <h2 id="comments-heading" class="comments-heading">COMMENTS</h2>
+
+      <div id="comments-list" class="comments-list">
+        <p class="comment-empty">Loading comments...</p>
+      </div>
+
+      <div class="comments-divider"></div>
+
+      <div id="comment-form" class="comment-form">
+        <textarea
+          id="comment-input"
+          class="comment-input"
+          maxlength="2000"
+          rows="4"
+          placeholder="Write your comment..."
+          aria-label="Write your comment"
+        ></textarea>
+
+        <div class="comment-form-footer">
+          <span id="comment-counter" class="comment-counter">0 / 100 characters minimum</span>
+          <button id="post-comment-button" class="action-button red comment-post-button" disabled>
+            POST COMMENT
+          </button>
+        </div>
+
+        <p id="comment-status" class="comment-status" aria-live="polite"></p>
+      </div>
+    </section>
   </main>
-  <aside class="info-panel"><div id="owner-panel"></div><hr><div class="info-section"><h3>COMMUNITY</h3><p>Public notes can be read by everyone. Only topic owners can manage notes in their own topics.</p></div><hr><div class="info-section"><h3>CONTACT</h3><div id="contact-links">Will post contact information soon.</div></div></aside>
+
+  <aside class="info-panel">
+    <div id="owner-panel"></div>
+    <hr>
+
+    <div class="info-section">
+      <h3>COMMUNITY</h3>
+      <p>Public notes can be read by everyone. Only topic owners can manage notes in their own topics.</p>
+    </div>
+
+    <hr>
+
+    <div class="info-section">
+      <h3>CONTACT</h3>
+      <div id="contact-links">Set your site contact links in Supabase.</div>
+    </div>
+  </aside>
 </div>
+
 <div class="drawer-backdrop" id="drawer-backdrop"></div>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="config.js"></script><script src="app.js"></script>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script src="app.js"></script>
 </body>
 </html>
