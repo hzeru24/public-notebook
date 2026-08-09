@@ -11,9 +11,7 @@
   }
 
   function text(id, value) {
-    if (el(id)) {
-      el(id).textContent = value;
-    }
+    if (el(id)) el(id).textContent = value;
   }
 
   function esc(value) {
@@ -110,11 +108,6 @@
   let session = null;
   let currentUser = null;
 
-
-  /* =========================================================
-     AUTHENTICATION
-  ========================================================= */
-
   async function initAuth() {
     const result = await supabase.auth.getSession();
 
@@ -157,11 +150,6 @@
     }
   }
 
-
-  /* =========================================================
-     PROFILE
-  ========================================================= */
-
   async function getProfile(userId) {
     const r = await supabase
       .from("profiles")
@@ -174,23 +162,27 @@
     return r.data;
   }
 
-
-  /* =========================================================
-     TOPIC DRAWER
-  ========================================================= */
-
   function setupDrawer() {
     const sidebar = el("topic-sidebar");
     const backdrop = el("drawer-backdrop");
 
-    el("topics-toggle")?.addEventListener("click", () => {
-      sidebar?.classList.add("open");
-      backdrop?.classList.add("open");
-    });
+    el("topics-toggle")?.addEventListener(
+      "click",
+      () => {
+        sidebar?.classList.add("open");
+        backdrop?.classList.add("open");
+      }
+    );
 
-    el("topics-close")?.addEventListener("click", close);
+    el("topics-close")?.addEventListener(
+      "click",
+      close
+    );
 
-    backdrop?.addEventListener("click", close);
+    backdrop?.addEventListener(
+      "click",
+      close
+    );
 
     function close() {
       sidebar?.classList.remove("open");
@@ -198,19 +190,12 @@
     }
   }
 
-
-  /* =========================================================
-     LOAD TOPICS
-  ========================================================= */
-
   async function loadTopics(
     pageNo = Number(query("topics_page") || 1)
   ) {
     const list = el("topic-list");
 
-    if (!list) {
-      return;
-    }
+    if (!list) return;
 
     const from = (pageNo - 1) * PAGE_SIZE;
     const to = from + PAGE_SIZE - 1;
@@ -231,28 +216,33 @@
       .range(from, to);
 
     if (r.error) {
-      list.innerHTML =
-        `<div class="muted">${esc(r.error.message)}</div>`;
+      list.innerHTML = `
+        <div class="muted">
+          ${esc(r.error.message)}
+        </div>
+      `;
 
       return;
     }
 
-    list.innerHTML = r.data
-      .map(
-        (t) => `
-          <a
-            class="topic-link"
-            href="topic.html?id=${encodeURIComponent(t.id)}"
-          >
-            <strong>${esc(t.name)}</strong>
-            <small>
-              @${esc(t.profiles?.username || "user")}
-            </small>
-          </a>
-        `
-      )
-      .join("")
-      ||
+    list.innerHTML =
+      r.data
+        .map(
+          (t) => `
+            <a
+              class="topic-link"
+              href="topic.html?id=${encodeURIComponent(t.id)}"
+            >
+              <strong>${esc(t.name)}</strong>
+              <small>
+                @${esc(
+                  t.profiles?.username || "user"
+                )}
+              </small>
+            </a>
+          `
+        )
+        .join("") ||
       `
         <div class="muted">
           No community topics yet.
@@ -270,20 +260,13 @@
     );
   }
 
-
-  /* =========================================================
-     PAGINATION
-  ========================================================= */
-
   function renderPagination(
     container,
     current,
     total,
     callback
   ) {
-    if (!container) {
-      return;
-    }
+    if (!container) return;
 
     if (total <= 1) {
       container.innerHTML = "";
@@ -328,23 +311,17 @@
     container
       .querySelectorAll("button:not(:disabled)")
       .forEach((b) => {
-        b.addEventListener("click", () => {
-          callback(Number(b.dataset.p));
-        });
+        b.addEventListener(
+          "click",
+          () => callback(Number(b.dataset.p))
+        );
       });
   }
-
-
-  /* =========================================================
-     GENERAL TOPIC PROGRESS
-  ========================================================= */
 
   async function loadProgress() {
     const box = el("progress-box");
 
-    if (!box) {
-      return;
-    }
+    if (!box) return;
 
     if (!currentUser) {
       box.innerHTML = `
@@ -384,7 +361,6 @@
     }
 
     const count = Number(r.data || 0);
-
     const pct = Math.min(
       100,
       (count / 20) * 100
@@ -414,23 +390,16 @@
           `
           : `
             <p>
-              Submit ${20 - count} more to unlock.
+              Submit ${20 - count} more
+              to unlock.
             </p>
           `
       }
     `;
   }
 
-
-  /* =========================================================
-     GET TOPIC
-  ========================================================= */
-
   async function getTopic(topicId) {
-    if (
-      topicId === "general" ||
-      !topicId
-    ) {
+    if (topicId === "general" || !topicId) {
       return {
         id: "general",
         name: "GENERAL",
@@ -459,11 +428,6 @@
     };
   }
 
-
-  /* =========================================================
-     LOAD NOTES
-  ========================================================= */
-
   async function loadNotes(
     topic,
     pageNo = Number(query("page") || 1)
@@ -471,26 +435,41 @@
     const list = el("note-list");
     const status = el("page-status");
 
-    if (!list) {
-      return;
-    }
+    if (!list) return;
 
-    const topicFilter = topic.isGeneral
-      ? "00000000-0000-0000-0000-000000000001"
-      : topic.id;
+    /*
+      GENERAL is stored internally with topic_id = NULL.
 
-    const from = (pageNo - 1) * PAGE_SIZE;
-    const to = from + PAGE_SIZE - 1;
+      Supabase/PostgREST cannot use .eq("topic_id", null)
+      for this case, so use .is("topic_id", null).
+    */
 
-    const r = await supabase
+    const from =
+      (pageNo - 1) * PAGE_SIZE;
+
+    const to =
+      from + PAGE_SIZE - 1;
+
+    let request = supabase
       .from("notes")
       .select(
         "id,topic_id,author_id,title,content,created_at,updated_at,profiles(username,display_name)",
-        {
-          count: "exact"
-        }
-      )
-      .eq("topic_id", topicFilter)
+        { count: "exact" }
+      );
+
+    if (topic.isGeneral) {
+      request = request.is(
+        "topic_id",
+        null
+      );
+    } else {
+      request = request.eq(
+        "topic_id",
+        topic.id
+      );
+    }
+
+    const r = await request
       .order("created_at", {
         ascending: false
       })
@@ -514,11 +493,9 @@
       .map((n) => {
         const owner = topic.isGeneral
           ? "Anonymous"
-          : (
-              n.profiles?.display_name ||
-              n.profiles?.username ||
-              "User"
-            );
+          : n.profiles?.display_name ||
+            n.profiles?.username ||
+            "User";
 
         const manage =
           !topic.isGeneral &&
@@ -613,7 +590,9 @@
         )
       ),
       (p) => {
-        const u = new URL(location.href);
+        const u = new URL(
+          location.href
+        );
 
         u.searchParams.set(
           "page",
@@ -631,12 +610,10 @@
     );
   }
 
-
-  /* =========================================================
-     DELETE NOTE
-  ========================================================= */
-
-  async function deleteNote(id, topic) {
+  async function deleteNote(
+    id,
+    topic
+  ) {
     if (
       !currentUser ||
       topic.isGeneral ||
@@ -665,17 +642,10 @@
     }
   }
 
-
-  /* =========================================================
-     TOPIC OWNER PANEL
-  ========================================================= */
-
   function renderOwner(topic) {
     const panel = el("owner-panel");
 
-    if (!panel) {
-      return;
-    }
+    if (!panel) return;
 
     if (topic.isGeneral) {
       panel.innerHTML = `
@@ -723,11 +693,6 @@
     `;
   }
 
-
-  /* =========================================================
-     TOPIC PAGE
-  ========================================================= */
-
   async function loadTopicPage() {
     setupDrawer();
 
@@ -771,7 +736,8 @@
       const allowed = topic.isGeneral
         ? !!currentUser
         : !!currentUser &&
-          currentUser.id === topic.owner_id;
+          currentUser.id ===
+            topic.owner_id;
 
       write.style.display = allowed
         ? "inline-flex"
@@ -791,29 +757,27 @@
         ".general-link"
       );
 
-    if (gen && topic.isGeneral) {
+    if (
+      gen &&
+      topic.isGeneral
+    ) {
       gen.classList.add("active");
     }
   }
 
-
-  /* =========================================================
-     EDITOR TOOLBAR
-  ========================================================= */
-
   function setupToolbar() {
     document
       .querySelectorAll("[data-command]")
-      .forEach((b) => {
+      .forEach((b) =>
         b.addEventListener(
           "mousedown",
           (e) => e.preventDefault()
-        );
-      });
+        )
+      );
 
     document
       .querySelectorAll("[data-command]")
-      .forEach((b) => {
+      .forEach((b) =>
         b.addEventListener(
           "click",
           () => {
@@ -827,45 +791,43 @@
 
             updateCounter();
           }
-        );
-      });
+        )
+      );
   }
 
-
-  /* =========================================================
-     EDITOR COUNTER
-  ========================================================= */
-
   function updateCounter() {
-    const e = el("editor");
-    const c = el("counter");
+    const editor = el("editor");
+    const counter = el("counter");
 
-    if (e && c) {
+    if (
+      editor &&
+      counter
+    ) {
       const n =
-        (e.innerText || "").length;
+        (editor.innerText || "")
+          .length;
 
-      c.textContent =
+      counter.textContent =
         `${n} / ${MAX_CONTENT}`;
 
-      c.classList.toggle(
+      counter.classList.toggle(
         "limit-warning",
         n > MAX_CONTENT * 0.9
       );
     }
   }
 
-
-  /* =========================================================
-     WRITE / EDIT NOTE
-  ========================================================= */
-
-  async function setupWriter(edit = false) {
+  async function setupWriter(
+    edit = false
+  ) {
     await initAuth();
 
     setupDrawer();
 
     if (!currentUser) {
-      location.href = "login.html";
+      location.href =
+        "login.html";
+
       return;
     }
 
@@ -884,7 +846,8 @@
 
     if (
       !topic.isGeneral &&
-      topic.owner_id !== currentUser.id
+      topic.owner_id !==
+        currentUser.id
     ) {
       text(
         "write-status",
@@ -909,14 +872,18 @@
     setupToolbar();
     updateCounter();
 
-    const editor = el("editor");
-    const title = el("title");
+    const editor =
+      el("editor");
+
+    const title =
+      el("title");
 
     editor?.addEventListener(
       "input",
       () => {
         if (
-          (editor.innerText || "").length >
+          (editor.innerText || "")
+            .length >
           MAX_CONTENT
         ) {
           editor.innerText =
@@ -936,13 +903,14 @@
     if (edit) {
       noteId = query("id");
 
-      const r = await supabase
-        .from("notes")
-        .select(
-          "id,title,content,topic_id,author_id"
-        )
-        .eq("id", noteId)
-        .maybeSingle();
+      const r =
+        await supabase
+          .from("notes")
+          .select(
+            "id,title,content,topic_id,author_id"
+          )
+          .eq("id", noteId)
+          .maybeSingle();
 
       if (
         r.error ||
@@ -958,14 +926,16 @@
         return;
       }
 
-      const t = await getTopic(
-        r.data.topic_id
-      );
+      const t =
+        await getTopic(
+          r.data.topic_id
+        );
 
       if (
         !t ||
         t.isGeneral ||
-        t.owner_id !== currentUser.id
+        t.owner_id !==
+          currentUser.id
       ) {
         text(
           "write-status",
@@ -984,109 +954,151 @@
         r.data.title;
 
       editor.innerHTML =
-        safeHtml(r.data.content);
+        safeHtml(
+          r.data.content
+        );
     }
 
-    el("post-button").addEventListener(
-      "click",
-      async () => {
-        const cleanTitle =
-          title.value.trim();
+    el("post-button")
+      .addEventListener(
+        "click",
+        async () => {
+          const cleanTitle =
+            title.value.trim();
 
-        const raw =
-          editor.innerHTML.trim();
+          const raw =
+            editor.innerHTML.trim();
 
-        const body = plain(raw);
+          const body =
+            plain(raw);
 
-        if (!cleanTitle || !body) {
+          if (
+            !cleanTitle ||
+            !body
+          ) {
+            text(
+              "write-status",
+              "Title and note content are required."
+            );
+
+            return;
+          }
+
+          if (
+            cleanTitle.length >
+              MAX_TITLE ||
+            body.length >
+              MAX_CONTENT
+          ) {
+            text(
+              "write-status",
+              "Your note is too long."
+            );
+
+            return;
+          }
+
+          const clean =
+            safeHtml(raw);
+
+          el(
+            "post-button"
+          ).disabled = true;
+
           text(
             "write-status",
-            "Title and note content are required."
+            edit
+              ? "Saving..."
+              : "Posting..."
           );
 
-          return;
+          let r;
+
+          if (edit) {
+            /*
+              Editing is only possible for
+              notes in user-created topics.
+            */
+
+            r =
+              await supabase
+                .from("notes")
+                .update({
+                  title:
+                    cleanTitle,
+                  content:
+                    clean,
+                  updated_at:
+                    new Date().toISOString()
+                })
+                .eq(
+                  "id",
+                  noteId
+                )
+                .select("id")
+                .single();
+
+          } else {
+            /*
+              IMPORTANT RLS FIX
+
+              The Supabase RLS policy requires:
+
+                  author_id = auth.uid()
+
+              Therefore the logged-in user's
+              UUID must explicitly be included
+              in the INSERT request.
+
+              Without this field, Supabase rejects
+              the insert with:
+
+              "new row violates row-level
+               security policy for table notes"
+            */
+
+            r =
+              await supabase
+                .from("notes")
+                .insert({
+                  topic_id:
+                    topic.isGeneral
+                      ? null
+                      : topic.id,
+
+                  author_id:
+                    currentUser.id,
+
+                  title:
+                    cleanTitle,
+
+                  content:
+                    clean
+                })
+                .select("id")
+                .single();
+          }
+
+          if (r.error) {
+            text(
+              "write-status",
+              r.error.message
+            );
+
+            el(
+              "post-button"
+            ).disabled = false;
+
+            return;
+          }
+
+          location.href =
+            `note.html?id=${encodeURIComponent(
+              r.data.id
+            )}`;
         }
-
-        if (
-          cleanTitle.length >
-            MAX_TITLE ||
-          body.length >
-            MAX_CONTENT
-        ) {
-          text(
-            "write-status",
-            "Your note is too long."
-          );
-
-          return;
-        }
-
-        const clean =
-          safeHtml(raw);
-
-        el("post-button").disabled =
-          true;
-
-        text(
-          "write-status",
-          edit
-            ? "Saving..."
-            : "Posting..."
-        );
-
-        let r;
-
-        if (edit) {
-          r = await supabase
-            .from("notes")
-            .update({
-              title: cleanTitle,
-              content: clean,
-              updated_at:
-                new Date().toISOString()
-            })
-            .eq("id", noteId)
-            .select("id")
-            .single();
-        } else {
-          r = await supabase
-            .from("notes")
-            .insert({
-              topic_id:
-                topic.isGeneral
-                  ? null
-                  : topic.id,
-              title: cleanTitle,
-              content: clean
-            })
-            .select("id")
-            .single();
-        }
-
-        if (r.error) {
-          text(
-            "write-status",
-            r.error.message
-          );
-
-          el("post-button").disabled =
-            false;
-
-          return;
-        }
-
-        location.href =
-          `note.html?id=${encodeURIComponent(
-            r.data.id
-          )}`;
-      }
-    );
+      );
   }
-
-
-  /* =========================================================
-     SINGLE NOTE PAGE
-  ========================================================= */
 
   async function loadSingleNote() {
     setupDrawer();
@@ -1095,7 +1107,8 @@
     await loadTopics();
     await loadProgress();
 
-    const id = query("id");
+    const id =
+      query("id");
 
     if (!id) {
       text(
@@ -1106,15 +1119,19 @@
       return;
     }
 
-    const r = await supabase
-      .from("notes")
-      .select(
-        "id,topic_id,author_id,title,content,created_at,updated_at,profiles(username,display_name)"
-      )
-      .eq("id", id)
-      .maybeSingle();
+    const r =
+      await supabase
+        .from("notes")
+        .select(
+          "id,topic_id,author_id,title,content,created_at,updated_at,profiles(username,display_name)"
+        )
+        .eq("id", id)
+        .maybeSingle();
 
-    if (r.error || !r.data) {
+    if (
+      r.error ||
+      !r.data
+    ) {
       text(
         "note",
         "This note could not be found."
@@ -1123,9 +1140,10 @@
       return;
     }
 
-    const topic = await getTopic(
-      r.data.topic_id
-    );
+    const topic =
+      await getTopic(
+        r.data.topic_id
+      );
 
     if (!topic) {
       text(
@@ -1136,24 +1154,30 @@
       return;
     }
 
-    text("owner-panel", "");
+    text(
+      "owner-panel",
+      ""
+    );
 
     renderOwner(topic);
 
-    el("back-topic").href =
+    el(
+      "back-topic"
+    ).href =
       `topic.html?id=${encodeURIComponent(
         topic.isGeneral
           ? "general"
           : topic.id
       )}`;
 
-    const owner = topic.isGeneral
-      ? "Anonymous"
-      : (
-          r.data.profiles?.display_name ||
-          r.data.profiles?.username ||
-          "User"
-        );
+    const owner =
+      topic.isGeneral
+        ? "Anonymous"
+        : r.data.profiles
+            ?.display_name ||
+          r.data.profiles
+            ?.username ||
+          "User";
 
     const manage =
       !topic.isGeneral &&
@@ -1166,7 +1190,9 @@
     el("note").innerHTML = `
       <div class="note-meta">
         Posted:
-        ${esc(date(r.data.created_at))}
+        ${esc(
+          date(r.data.created_at)
+        )}
       </div>
 
       <div class="note-author">
@@ -1180,10 +1206,13 @@
       <hr>
 
       <div class="note-content">
-        ${safeHtml(r.data.content)}
+        ${safeHtml(
+          r.data.content
+        )}
       </div>
 
       <div class="note-bottom">
+
         ${
           manage
             ? `
@@ -1207,10 +1236,13 @@
               This note is read-only.
             `
         }
+
       </div>
     `;
 
-    el("single-delete")?.addEventListener(
+    el(
+      "single-delete"
+    )?.addEventListener(
       "click",
       async () => {
         if (
@@ -1222,151 +1254,133 @@
             await supabase
               .from("notes")
               .delete()
-              .eq("id", id);
+              .eq(
+                "id",
+                id
+              );
 
           if (d.error) {
-            alert(d.error.message);
+            alert(
+              d.error.message
+            );
           } else {
             location.href =
-              el("back-topic").href;
+              el(
+                "back-topic"
+              ).href;
           }
         }
       }
     );
   }
 
-
-  /* =========================================================
-     LOGIN / REGISTRATION
-  ========================================================= */
-
-  async function setupAuth(register) {
+  async function setupAuth(
+    register
+  ) {
     if (register) {
       setupDrawer();
     }
 
-    el("auth-submit")?.addEventListener(
-      "click",
-      async () => {
-        const email =
-          el("email")?.value.trim();
+    el("auth-submit")
+      ?.addEventListener(
+        "click",
+        async () => {
+          const email =
+            el("email")
+              ?.value.trim();
 
-        const password =
-          el("password")?.value;
+          const password =
+            el("password")
+              ?.value;
 
-        const username =
-          el("username")?.value.trim();
+          const username =
+            el("username")
+              ?.value.trim();
 
-        if (
-          !email ||
-          !password ||
-          (register && !username)
-        ) {
+          if (
+            !email ||
+            !password ||
+            (register &&
+              !username)
+          ) {
+            text(
+              "auth-status",
+              "Please complete all fields."
+            );
+
+            return;
+          }
+
+          el(
+            "auth-submit"
+          ).disabled = true;
+
           text(
             "auth-status",
-            "Please complete all fields."
+            register
+              ? "Creating account..."
+              : "Logging in..."
           );
 
-          return;
+          let r;
+
+          if (register) {
+            r =
+              await supabase.auth.signUp(
+                {
+                  email,
+                  password,
+                  options: {
+                    data: {
+                      username
+                    }
+                  }
+                }
+              );
+          } else {
+            r =
+              await supabase.auth.signInWithPassword(
+                {
+                  email,
+                  password
+                }
+              );
+          }
+
+          if (r.error) {
+            text(
+              "auth-status",
+              r.error.message
+            );
+
+            el(
+              "auth-submit"
+            ).disabled = false;
+
+            return;
+          }
+
+          if (
+            register &&
+            !r.data.session
+          ) {
+            text(
+              "auth-status",
+              "Account created. Check your email if email confirmation is enabled, then log in."
+            );
+
+            el(
+              "auth-submit"
+            ).disabled = false;
+
+            return;
+          }
+
+          location.href =
+            "index.html";
         }
-
-        el("auth-submit").disabled =
-          true;
-
-        text(
-          "auth-status",
-          register
-            ? "Creating account..."
-            : "Logging in..."
-        );
-
-        let r;
-
-        /* =====================================================
-           REGISTRATION
-
-           IMPORTANT:
-           This URL is your GitHub Pages website,
-           NOT the GitHub repository URL.
-        ===================================================== */
-
-        if (register) {
-          r = await supabase.auth.signUp({
-            email: email,
-            password: password,
-
-            options: {
-              emailRedirectTo:
-                "https://hzeru24.github.io/public-notebook/index.html",
-
-              data: {
-                username: username
-              }
-            }
-          });
-        }
-
-        /* =====================================================
-           LOGIN
-        ===================================================== */
-
-        else {
-          r =
-            await supabase.auth.signInWithPassword({
-              email: email,
-              password: password
-            });
-        }
-
-        /* =====================================================
-           ERROR
-        ===================================================== */
-
-        if (r.error) {
-          text(
-            "auth-status",
-            r.error.message
-          );
-
-          el("auth-submit").disabled =
-            false;
-
-          return;
-        }
-
-        /* =====================================================
-           EMAIL VERIFICATION REQUIRED
-        ===================================================== */
-
-        if (
-          register &&
-          !r.data.session
-        ) {
-          text(
-            "auth-status",
-            "Account created. Check your email to verify your account, then log in."
-          );
-
-          el("auth-submit").disabled =
-            false;
-
-          return;
-        }
-
-        /* =====================================================
-           SUCCESSFUL LOGIN / SIGNUP
-        ===================================================== */
-
-        location.href =
-          "index.html";
-      }
-    );
+      );
   }
-
-
-  /* =========================================================
-     CREATE TOPIC
-  ========================================================= */
 
   async function setupCreateTopic() {
     await initAuth();
@@ -1399,18 +1413,19 @@
       return;
     }
 
-    el("create-topic-button").addEventListener(
+    el(
+      "create-topic-button"
+    ).addEventListener(
       "click",
       async () => {
         const name =
           el("topic-name")
-            .value
-            .trim();
+            .value.trim();
 
         const description =
-          el("topic-description")
-            .value
-            .trim();
+          el(
+            "topic-description"
+          ).value.trim();
 
         if (!name) {
           text(
@@ -1461,11 +1476,6 @@
     );
   }
 
-
-  /* =========================================================
-     ACCOUNT PAGE
-  ========================================================= */
-
   async function setupAccount() {
     await initAuth();
 
@@ -1484,7 +1494,8 @@
     text(
       "account-name",
       "@" +
-        (p?.username || "user")
+        (p?.username ||
+          "user")
     );
 
     text(
@@ -1544,7 +1555,9 @@
       }
     `;
 
-    el("logout-button").addEventListener(
+    el(
+      "logout-button"
+    ).addEventListener(
       "click",
       async () => {
         await supabase.auth.signOut();
@@ -1555,32 +1568,31 @@
     );
   }
 
-
-  /* =========================================================
-     START APPLICATION
-  ========================================================= */
-
   async function start() {
     if (
       page === "home" ||
       page === "topic"
     ) {
       await loadTopicPage();
-    }
 
-    else if (page === "note") {
+    } else if (
+      page === "note"
+    ) {
       await loadSingleNote();
-    }
 
-    else if (page === "write") {
+    } else if (
+      page === "write"
+    ) {
       await setupWriter(false);
-    }
 
-    else if (page === "edit") {
+    } else if (
+      page === "edit"
+    ) {
       await setupWriter(true);
-    }
 
-    else if (page === "login") {
+    } else if (
+      page === "login"
+    ) {
       await initAuth();
 
       if (currentUser) {
@@ -1589,9 +1601,10 @@
       } else {
         setupAuth(false);
       }
-    }
 
-    else if (page === "register") {
+    } else if (
+      page === "register"
+    ) {
       await initAuth();
 
       if (currentUser) {
@@ -1600,15 +1613,15 @@
       } else {
         setupAuth(true);
       }
-    }
 
-    else if (
+    } else if (
       page === "create-topic"
     ) {
       await setupCreateTopic();
-    }
 
-    else if (page === "account") {
+    } else if (
+      page === "account"
+    ) {
       await setupAccount();
     }
   }
