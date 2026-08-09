@@ -504,8 +504,8 @@ button,input,textarea{font-family:inherit}
 }
 
 .owner-badge img{
-  width:200%;
-  height:200%;
+  width:175%;
+  height:175%;
   object-fit:contain;
   object-position:center;
 }
