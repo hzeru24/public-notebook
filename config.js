@@ -4,6 +4,6 @@
   NEVER place a Supabase Secret/service_role key here.
 */
 window.PUBLIC_NOTEBOOK_CONFIG = {
-  supabaseUrl: "PASTE_YOUR_SUPABASE_PROJECT_URL_HERE",
-  supabaseKey: "PASTE_YOUR_SUPABASE_PUBLISHABLE_KEY_HERE"
+  supabaseUrl: "https://rolmrtytquewmeecipsq.supabase.co",
+  supabaseKey: "sb_publishable_wsKrn-04qealbY_5EwAwCw_H9NKfnlS"
 };
