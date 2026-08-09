@@ -1,0 +1,11 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Create Topic - Public Notebook</title><link rel="stylesheet" href="style.css"></head>
+<body data-page="create-topic">
+<header class="topbar"><a class="brand" href="index.html">PUBLIC NOTEBOOK</a><div class="topbar-right"><span id="auth-label"></span><a class="small-button" id="auth-button" href="login.html">LOGIN</a></div></header>
+<main class="form-page"><section class="form-card"><div class="eyebrow">NEW COMMUNITY TOPIC</div><h1>Create your topic</h1><p class="form-help">You need at least 20 submitted notes in GENERAL before this form can be used.</p>
+<label class="field-label">TOPIC NAME<input id="topic-name" maxlength="80" placeholder="e.g. Photography"></label>
+<label class="field-label">DESCRIPTION<textarea id="topic-description" maxlength="300" rows="5" placeholder="What belongs in this topic?"></textarea></label>
+<button id="create-topic-button" class="action-button green wide">CREATE TOPIC</button><p id="topic-status" class="form-status"></p><a class="back-link" href="index.html">← BACK TO NOTEBOOK</a></section></main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="config.js"></script><script src="app.js"></script>
+</body></html>
