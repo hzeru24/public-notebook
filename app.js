@@ -656,13 +656,15 @@
         <h2>GENERAL</h2>
 
         <p>
-          Community-wide notes submitted
-          by registered members.
+          Registered members can upload 
+          notes readable by the public. 
+          Upon posting 20 notes, users 
+          can create topics of their own.
         </p>
 
         <p class="muted">
-          Submitted notes are permanently
-          read-only.
+          Submitted notes in General are 
+          permanently read-only.
         </p>
       `;
 
