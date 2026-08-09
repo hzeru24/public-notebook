@@ -450,34 +450,12 @@
     const to =
       from + PAGE_SIZE - 1;
 
-    let request =
-      supabase
-        .from("notes")
-        .select(
-          `
-            id,
-            title,
-            content,
-            topic_id,
-            author_id,
-            created_at,
-            profiles(
-              username,
-              display_name,
-              avatar_url
-            )
-          `,
-          {
-            count: "exact"
-          }
-        )
-        .order(
-          "created_at",
-          {
-            ascending: false
-          }
-        )
-        .range(from, to);
+    let request = supabase
+      .from("notes")
+      .select(
+        "id,topic_id,author_id,title,content,created_at,updated_at,profiles(username,display_name)",
+        { count: "exact" }
+      );
 
     if (topic.isGeneral) {
       request = request.is(
@@ -491,63 +469,116 @@
       );
     }
 
-    const r = await request;
+    const r = await request
+      .order("created_at", {
+        ascending: false
+      })
+      .range(from, to);
 
     if (r.error) {
-      if (status) {
-        status.textContent =
-          r.error.message;
-      }
+      text(
+        "page-status",
+        "Could not load notes: " +
+          r.error.message
+      );
 
       return;
     }
 
-    if (status) {
-      status.textContent = "";
-    }
+    status.textContent = r.data.length
+      ? ""
+      : "No notes have been posted here yet.";
 
-    list.innerHTML =
-      r.data
-        .map(
-          (note) => `
-            <article class="note-card">
+    list.innerHTML = r.data
+      .map((n) => {
+        const owner = topic.isGeneral
+          ? "Anonymous"
+          : n.profiles?.display_name ||
+            n.profiles?.username ||
+            "User";
 
-              <div class="note-card-inner">
+        const manage =
+          !topic.isGeneral &&
+          currentUser &&
+          n.author_id === currentUser.id &&
+          topic.owner_id === currentUser.id;
 
-                <h2>
-                  ${esc(note.title)}
-                </h2>
+        return `
+          <article class="note-card">
 
-                <div class="note-meta">
-                  ${date(note.created_at)}
-                </div>
+            <div class="note-main">
 
-                <p>
-                  ${esc(
-                    excerpt(
-                      note.content
-                    )
-                  )}
-                </p>
+              <div class="note-author">
+                ${esc(owner)}
+              </div>
+
+              <h2>
+                ${esc(n.title)}
+              </h2>
+
+              <p>
+                ${esc(excerpt(n.content))}
+              </p>
+
+            </div>
+
+            <div class="note-side">
+
+              <div class="posted">
+                Posted:
+                ${esc(date(n.created_at))}
+              </div>
+
+              <div class="note-actions">
 
                 <a
-                  class="read-link"
-                  href="note.html?id=${encodeURIComponent(note.id)}"
+                  class="read-button"
+                  href="note.html?id=${encodeURIComponent(n.id)}"
                 >
                   READ →
                 </a>
 
+                ${
+                  manage
+                    ? `
+                      <a
+                        class="edit-link"
+                        href="edit-note.html?id=${encodeURIComponent(n.id)}"
+                      >
+                        EDIT
+                      </a>
+
+                      <button
+                        class="delete-link"
+                        data-delete="${esc(n.id)}"
+                      >
+                        DELETE
+                      </button>
+                    `
+                    : ""
+                }
+
               </div>
 
-            </article>
-          `
-        )
-        .join("") ||
-      `
-        <div class="empty-state">
-          No notes have been published yet.
-        </div>
-      `;
+            </div>
+
+          </article>
+        `;
+      })
+      .join("");
+
+    list
+      .querySelectorAll("[data-delete]")
+      .forEach((b) => {
+        b.addEventListener(
+          "click",
+          () =>
+            deleteNote(
+              b.dataset.delete,
+              topic
+            )
+        );
+      });
 
     renderPagination(
       el("note-pagination"),
@@ -555,240 +586,301 @@
       Math.max(
         1,
         Math.ceil(
-          (r.count || 0) /
-          PAGE_SIZE
+          (r.count || 0) / PAGE_SIZE
         )
       ),
       (p) => {
-        const params =
-          new URLSearchParams(
-            location.search
-          );
-
-        params.set(
-          "page",
-          String(p)
+        const u = new URL(
+          location.href
         );
 
-        location.href =
-          `${location.pathname}?${params.toString()}`;
+        u.searchParams.set(
+          "page",
+          p
+        );
+
+        history.pushState(
+          {},
+          "",
+          u
+        );
+
+        loadNotes(topic, p);
       }
     );
   }
 
-  function renderOwnerPanel(topic) {
+  async function deleteNote(
+    id,
+    topic
+  ) {
+    if (
+      !currentUser ||
+      topic.isGeneral ||
+      !confirm(
+        "Delete this note permanently?"
+      )
+    ) {
+      return;
+    }
+
+    const r = await supabase
+      .from("notes")
+      .delete()
+      .eq("id", id);
+
+    if (r.error) {
+      alert(
+        "Delete failed: " +
+          r.error.message
+      );
+    } else {
+      loadNotes(
+        topic,
+        Number(query("page") || 1)
+      );
+    }
+  }
+
+  function renderOwner(topic) {
     const panel = el("owner-panel");
 
     if (!panel) return;
 
-    if (!topic || topic.isGeneral) {
+    if (topic.isGeneral) {
       panel.innerHTML = `
-        <div class="owner-heading">
-          OWNER
-        </div>
-
         <div class="owner-badge">
-          <span>◯</span>
-        </div>
+  <img src="assets/logo.png" alt="Public Notebook">
+</div>
 
-        <div class="owner-name">
-          PUBLIC NOTEBOOK
-        </div>
+        <h2>GENERAL</h2>
 
-        <p class="owner-bio">
-          A public space for shared thoughts,
-          stories, and notes.
+        <p>
+          Registered members can upload 
+          notes readable by the public. 
+          Upon posting 20 notes, users 
+          can create topics of their own.
+        </p>
+
+        <p class="muted">
+          Submitted notes in General are 
+          permanently read-only.
         </p>
       `;
 
       return;
     }
 
-    const profile =
-      topic.profiles || {};
+    const p = topic.profiles || {};
 
     panel.innerHTML = `
-      <div class="owner-heading">
-        OWNER
-      </div>
-
-      <div class="owner-badge">
-
-        ${
-          profile.avatar_url
-            ? `
-              <img
-                src="${esc(
-                  profile.avatar_url
-                )}"
-                alt=""
-              >
-            `
-            : `
-              <span>◯</span>
-            `
-        }
-
-      </div>
-
-      <div class="owner-name">
-        @${esc(
-          profile.username ||
-          "user"
+      <div class="owner-avatar">
+        ${esc(
+          (p.username || "U")
+            .slice(0, 1)
+            .toUpperCase()
         )}
       </div>
 
-      ${
-        profile.display_name
-          ? `
-            <div class="owner-display-name">
-              ${esc(
-                profile.display_name
-              )}
-            </div>
-          `
-          : ""
-      }
+      <h2>
+        @${esc(p.username || "user")}
+      </h2>
 
-      <p class="owner-bio">
+      <p>
         ${esc(
-          profile.bio ||
-          "No bio yet."
+          p.bio ||
+            "This is my public notebook topic."
         )}
       </p>
     `;
   }
 
   async function loadTopicPage() {
-    const topicId =
-      query("id") || "general";
+    setupDrawer();
 
-    const topic =
-      await getTopic(topicId);
+    await initAuth();
+    await loadTopics();
+    await loadProgress();
 
-    const heading =
-      el("topic-title");
-
-    const description =
-      el("topic-description");
+    const topic = await getTopic(
+      query("id") || "general"
+    );
 
     if (!topic) {
-      if (heading) {
-        heading.textContent =
-          "Topic not found";
-      }
-
-      return;
-    }
-
-    if (heading) {
-      heading.textContent =
-        topic.name;
-    }
-
-    if (description) {
-      description.textContent =
-        topic.description || "";
-    }
-
-    renderOwnerPanel(topic);
-
-    await loadNotes(topic);
-  }
-
-  async function loadSingleNote() {
-    const id = query("id");
-
-    const article =
-      el("note");
-
-    if (!article || !id) {
-      return;
-    }
-
-    const r =
-      await supabase
-        .from("notes")
-        .select(
-          `
-            id,
-            title,
-            content,
-            topic_id,
-            author_id,
-            created_at,
-            profiles(
-              id,
-              username,
-              display_name,
-              bio,
-              avatar_url
-            )
-          `
-        )
-        .eq("id", id)
-        .maybeSingle();
-
-    if (r.error || !r.data) {
-      article.innerHTML = `
-        <div class="empty-state">
-          Note not found.
-        </div>
-      `;
-
-      return;
-    }
-
-    const note = r.data;
-
-    const profile =
-      note.profiles || {};
-
-    article.innerHTML = `
-      <header class="note-header">
-
-        <h1>
-          ${esc(note.title)}
-        </h1>
-
-        <div class="note-author">
-          @${esc(
-            profile.username ||
-            "user"
-          )}
-        </div>
-
-        <div class="note-date">
-          ${date(note.created_at)}
-        </div>
-
-      </header>
-
-      <div class="note-body">
-        ${safeHtml(note.content)}
-      </div>
-    `;
-
-    const back =
-      el("back-topic");
-
-    if (back) {
-      back.href =
-        note.topic_id
-          ? `topic.html?id=${encodeURIComponent(note.topic_id)}`
-          : "topic.html?id=general";
-    }
-
-    const topic =
-      await getTopic(
-        note.topic_id || "general"
+      text(
+        "current-topic-name",
+        "Topic not found"
       );
 
-    renderOwnerPanel(topic);
+      text(
+        "page-status",
+        "This topic does not exist."
+      );
 
-    await loadComments(id);
+      return;
+    }
+
+    text(
+      "current-topic-name",
+      topic.name
+    );
+
+    text(
+      "current-topic-description",
+      topic.description || ""
+    );
+
+    renderOwner(topic);
+
+    const write = el("write-button");
+
+    if (write) {
+      const allowed = topic.isGeneral
+        ? !!currentUser
+        : !!currentUser &&
+          currentUser.id ===
+            topic.owner_id;
+
+      write.style.display = allowed
+        ? "inline-flex"
+        : "none";
+
+      write.href = topic.isGeneral
+        ? "write.html?topic=general"
+        : `write.html?topic=${encodeURIComponent(
+            topic.id
+          )}`;
+    }
+
+    await loadNotes(topic);
+
+    const gen =
+      document.querySelector(
+        ".general-link"
+      );
+
+    if (
+      gen &&
+      topic.isGeneral
+    ) {
+      gen.classList.add("active");
+    }
   }
-      editor?.addEventListener(
+
+  function setupToolbar() {
+    document
+      .querySelectorAll("[data-command]")
+      .forEach((b) =>
+        b.addEventListener(
+          "mousedown",
+          (e) => e.preventDefault()
+        )
+      );
+
+    document
+      .querySelectorAll("[data-command]")
+      .forEach((b) =>
+        b.addEventListener(
+          "click",
+          () => {
+            document.execCommand(
+              b.dataset.command,
+              false,
+              null
+            );
+
+            el("editor")?.focus();
+
+            updateCounter();
+          }
+        )
+      );
+  }
+
+  function updateCounter() {
+    const editor = el("editor");
+    const counter = el("counter");
+
+    if (
+      editor &&
+      counter
+    ) {
+      const n =
+        (editor.innerText || "")
+          .length;
+
+      counter.textContent =
+        `${n} / ${MAX_CONTENT}`;
+
+      counter.classList.toggle(
+        "limit-warning",
+        n > MAX_CONTENT * 0.9
+      );
+    }
+  }
+
+  async function setupWriter(
+    edit = false
+  ) {
+    await initAuth();
+
+    setupDrawer();
+
+    if (!currentUser) {
+      location.href =
+        "login.html";
+
+      return;
+    }
+
+    const topic = await getTopic(
+      query("topic") || "general"
+    );
+
+    if (!topic) {
+      text(
+        "write-status",
+        "Topic not found."
+      );
+
+      return;
+    }
+
+    if (
+      !topic.isGeneral &&
+      topic.owner_id !==
+        currentUser.id
+    ) {
+      text(
+        "write-status",
+        "Only the topic owner can add notes here."
+      );
+
+      return;
+    }
+
+    text(
+      "writer-topic",
+      topic.name
+    );
+
+    el("writer-back").href =
+      `topic.html?id=${encodeURIComponent(
+        topic.isGeneral
+          ? "general"
+          : topic.id
+      )}`;
+
+    setupToolbar();
+    updateCounter();
+
+    const editor =
+      el("editor");
+
+    const title =
+      el("title");
+
+    editor?.addEventListener(
       "input",
       () => {
         if (
@@ -808,1204 +900,10 @@
       }
     );
 
-    if (edit) {
-      const noteId = query("id");
-
-      if (!noteId) {
-        text(
-          "write-status",
-          "Missing note ID."
-        );
-
-        return;
-      }
-
-      const r = await supabase
-        .from("notes")
-        .select(
-          "id,title,content,topic_id,author_id"
-        )
-        .eq("id", noteId)
-        .maybeSingle();
-
-      if (r.error || !r.data) {
-        text(
-          "write-status",
-          "Note not found."
-        );
-
-        return;
-      }
-
-      if (
-        r.data.author_id !==
-        currentUser.id
-      ) {
-        text(
-          "write-status",
-          "You cannot edit this note."
-        );
-
-        return;
-      }
-
-      if (
-        !topic.isGeneral &&
-        r.data.topic_id !==
-        topic.id
-      ) {
-        text(
-          "write-status",
-          "This note does not belong to this topic."
-        );
-
-        return;
-      }
-
-      if (title) {
-        title.value =
-          r.data.title || "";
-      }
-
-      if (editor) {
-        editor.innerHTML =
-          safeHtml(
-            r.data.content || ""
-          );
-      }
-
-      updateCounter();
-    }
-
-    el("save-note")
-      ?.addEventListener(
-        "click",
-        async () => {
-
-          const titleValue =
-            title?.value.trim() || "";
-
-          const contentValue =
-            editor?.innerHTML || "";
-
-          const plainContent =
-            plain(contentValue);
-
-          if (
-            !titleValue ||
-            titleValue.length >
-              MAX_TITLE
-          ) {
-            text(
-              "write-status",
-              "Enter a valid title."
-            );
-
-            return;
-          }
-
-          if (
-            !plainContent ||
-            plainContent.length >
-              MAX_CONTENT
-          ) {
-            text(
-              "write-status",
-              "Enter valid note content."
-            );
-
-            return;
-          }
-
-          const button =
-            el("save-note");
-
-          if (button) {
-            button.disabled = true;
-          }
-
-          text(
-            "write-status",
-            edit
-              ? "Saving changes..."
-              : "Publishing..."
-          );
-
-          let r;
-
-          if (edit) {
-
-            const noteId =
-              query("id");
-
-            r = await supabase
-              .from("notes")
-              .update({
-                title: titleValue,
-                content: contentValue
-              })
-              .eq(
-                "id",
-                noteId
-              )
-              .eq(
-                "author_id",
-                currentUser.id
-              );
-
-          } else {
-
-            r = await supabase
-              .from("notes")
-              .insert({
-                title: titleValue,
-                content: contentValue,
-                topic_id:
-                  topic.isGeneral
-                    ? null
-                    : topic.id,
-                author_id:
-                  currentUser.id
-              });
-
-          }
-
-          if (r.error) {
-
-            text(
-              "write-status",
-              r.error.message
-            );
-
-            if (button) {
-              button.disabled = false;
-            }
-
-            return;
-          }
-
-          if (edit) {
-
-            location.href =
-              `note.html?id=${encodeURIComponent(
-                query("id")
-              )}`;
-
-          } else {
-
-            location.href =
-              `topic.html?id=${encodeURIComponent(
-                topic.isGeneral
-                  ? "general"
-                  : topic.id
-              )}`;
-
-          }
-
-        }
-      );
-  }
-
-  function commentDate(v) {
-    return new Date(v).toLocaleDateString(
-      undefined,
-      {
-        year: "numeric",
-        month: "short",
-        day: "numeric"
-      }
-    );
-  }
-
-  async function loadComments(noteId) {
-
-    const list =
-      el("comments-list");
-
-    const form =
-      el("comment-form");
-
-    const input =
-      el("comment-input");
-
-    const counter =
-      el("comment-counter");
-
-    const button =
-      el("post-comment-button");
-
-    const status =
-      el("comment-status");
-
-    if (!list) {
-      return;
-    }
-
-    const refreshControls =
-      () => {
-
-        if (
-          !input ||
-          !counter ||
-          !button
-        ) {
-          return;
-        }
-
-        const count =
-          input.value
-            .trim()
-            .length;
-
-        counter.textContent =
-          `${count} / 100 characters minimum`;
-
-        button.disabled =
-          !currentUser ||
-          count < 100;
-      };
-
-    if (!currentUser) {
-
-      if (form) {
-
-        form.innerHTML = `
-          <div class="comment-login-note">
-
-            <span>
-              Sign in to leave a comment.
-            </span>
-
-            <a
-              class="action-button blue"
-              href="login.html"
-            >
-              LOGIN
-            </a>
-
-          </div>
-        `;
-
-      }
-
-    } else if (
-      input &&
-      counter &&
-      button
-    ) {
-
-      input.addEventListener(
-        "input",
-        refreshControls
-      );
-
-      refreshControls();
-
-      button.addEventListener(
-        "click",
-        async () => {
-
-          const content =
-            input.value.trim();
-
-          if (
-            content.length < 100
-          ) {
-
-            if (status) {
-              status.textContent =
-                "Your comment must contain at least 100 characters.";
-            }
-
-            refreshControls();
-
-            return;
-          }
-
-          if (
-            content.length > 2000
-          ) {
-
-            if (status) {
-              status.textContent =
-                "Your comment cannot exceed 2,000 characters.";
-            }
-
-            return;
-          }
-
-          button.disabled = true;
-
-          if (status) {
-            status.textContent =
-              "Posting comment...";
-          }
-
-          const r =
-            await supabase
-              .from("comments")
-              .insert({
-                note_id: noteId,
-                author_id:
-                  currentUser.id,
-                content
-              });
-
-          if (r.error) {
-
-            if (status) {
-              status.textContent =
-                r.error.message;
-            }
-
-            refreshControls();
-
-            return;
-          }
-
-          input.value = "";
-
-          if (status) {
-            status.textContent =
-              "Comment posted.";
-          }
-
-          refreshControls();
-
-          await renderComments(
-            noteId
-          );
-
-        }
-      );
-
-    }
-
-    await renderComments(
-      noteId
-    );
-  }
-
-  async function renderComments(
-    noteId
-  ) {
-
-    const list =
-      el("comments-list");
-
-    if (!list) {
-      return;
-    }
-
-    const r =
-      await supabase
-        .from("comments")
-        .select(
-          "id,content,created_at,author_id,profiles(username,display_name)"
-        )
-        .eq(
-          "note_id",
-          noteId
-        )
-        .order(
-          "created_at",
-          {
-            ascending: true
-          }
-        );
-
-    if (r.error) {
-
-      list.innerHTML = `
-        <p class="comment-empty">
-          Could not load comments:
-          ${esc(r.error.message)}
-        </p>
-      `;
-
-      return;
-    }
-
-    if (!r.data?.length) {
-
-      list.innerHTML = `
-        <p class="comment-empty">
-          No comments yet.
-          Be the first to leave a thoughtful note.
-        </p>
-      `;
-
-      return;
-    }
-
-    list.innerHTML =
-      r.data
-        .map(
-          (comment) => {
-
-            const username =
-              comment.profiles
-                ?.username ||
-              "user";
-
-            return `
-              <article
-                class="comment-entry"
-              >
-
-                <span
-                  class="comment-author"
-                >
-                  @${esc(
-                    username
-                  )}
-                </span>
-
-                <span
-                  class="comment-date"
-                >
-                  (${esc(
-                    commentDate(
-                      comment.created_at
-                    )
-                  )})
-                </span>:
-
-                <span
-                  class="comment-text"
-                >
-                  ${esc(
-                    comment.content
-                  )}
-                </span>
-
-              </article>
-            `;
-
-          }
-        )
-        .join("");
-  }
-
-  async function setupAuthPage() {
-
-    const mode =
-      document.body.dataset.authMode;
-
-    if (!mode) {
-      return;
-    }
-
-    await initAuth();
-
-    const form =
-      el("auth-form");
-
-    if (!form) {
-      return;
-    }
-
-    if (
-      currentUser &&
-      (
-        mode === "login" ||
-        mode === "register"
-      )
-    ) {
-
-      location.href =
-        "index.html";
-
-      return;
-    }
-
-    form.addEventListener(
-      "submit",
-      async (event) => {
-
-        event.preventDefault();
-
-        const email =
-          el("email")?.value
-            .trim() || "";
-
-        const password =
-          el("password")?.value || "";
-
-        const username =
-          el("username")?.value
-            .trim() || "";
-
-        const displayName =
-          el("display-name")
-            ?.value.trim() || "";
-
-        text(
-          "auth-status",
-          ""
-        );
-
-        if (
-          !email ||
-          !password
-        ) {
-
-          text(
-            "auth-status",
-            "Email and password are required."
-          );
-
-          return;
-        }
-
-        const button =
-          form.querySelector(
-            "button[type='submit']"
-          );
-
-        if (button) {
-          button.disabled = true;
-        }
-
-        if (mode === "login") {
-
-          const r =
-            await supabase.auth.signInWithPassword(
-              {
-                email,
-                password
-              }
-            );
-
-          if (r.error) {
-
-            text(
-              "auth-status",
-              r.error.message
-            );
-
-            if (button) {
-              button.disabled = false;
-            }
-
-            return;
-          }
-
-          location.href =
-            "index.html";
-
-          return;
-        }
-
-        if (
-          mode === "register"
-        ) {
-
-          if (
-            !username ||
-            username.length < 3
-          ) {
-
-            text(
-              "auth-status",
-              "Username must be at least 3 characters."
-            );
-
-            if (button) {
-              button.disabled = false;
-            }
-
-            return;
-          }
-
-          const r =
-            await supabase.auth.signUp(
-              {
-                email,
-                password,
-                options: {
-                  data: {
-                    username,
-                    display_name:
-                      displayName ||
-                      username
-                  }
-                }
-              }
-            );
-
-          if (r.error) {
-
-            text(
-              "auth-status",
-              r.error.message
-            );
-
-            if (button) {
-              button.disabled = false;
-            }
-
-            return;
-          }
-
-          /*
-            Email confirmation is intentionally not
-            required by the application UI.
-
-            If Supabase's "Confirm email" setting is
-            disabled, signUp() returns an active session.
-          */
-
-          if (r.data.session) {
-
-            text(
-              "auth-status",
-              "Account created! You can now use your notebook."
-            );
-
-            setTimeout(
-              () => {
-                location.href =
-                  "index.html";
-              },
-              700
-            );
-
-          } else {
-
-            text(
-              "auth-status",
-              "Account created! You can now use your notebook."
-            );
-
-            if (button) {
-              button.disabled = false;
-            }
-
-          }
-
-        }
-
-      }
-    );
-  }
-
-  async function setupAccountPage() {
-
-    await initAuth();
-
-    if (!currentUser) {
-
-      location.href =
-        "login.html";
-
-      return;
-    }
-
-    const profile =
-      await getProfile(
-        currentUser.id
-      );
-
-    if (el("account-username")) {
-      el("account-username").value =
-        profile?.username ||
-        currentUser.user_metadata
-          ?.username ||
-        "";
-    }
-
-    if (el("account-display-name")) {
-      el("account-display-name").value =
-        profile?.display_name ||
-        currentUser.user_metadata
-          ?.display_name ||
-        "";
-    }
-
-    if (el("account-bio")) {
-      el("account-bio").value =
-        profile?.bio || "";
-    }
-
-    if (el("account-avatar-url")) {
-      el("account-avatar-url").value =
-        profile?.avatar_url || "";
-    }
-
-    el("account-form")
-      ?.addEventListener(
-        "submit",
-        async (event) => {
-
-          event.preventDefault();
-
-          const username =
-            el("account-username")
-              ?.value.trim() || "";
-
-          const displayName =
-            el("account-display-name")
-              ?.value.trim() || "";
-
-          const bio =
-            el("account-bio")
-              ?.value.trim() || "";
-
-          const avatarUrl =
-            el("account-avatar-url")
-              ?.value.trim() || "";
-
-          if (
-            username.length < 3
-          ) {
-
-            text(
-              "account-status",
-              "Username must be at least 3 characters."
-            );
-
-            return;
-          }
-
-          const r =
-            await supabase
-              .from("profiles")
-              .upsert(
-                {
-                  id:
-                    currentUser.id,
-                  username,
-                  display_name:
-                    displayName ||
-                    username,
-                  bio,
-                  avatar_url:
-                    avatarUrl ||
-                    null
-                },
-                {
-                  onConflict:
-                    "id"
-                }
-              );
-
-          if (r.error) {
-
-            text(
-              "account-status",
-              r.error.message
-            );
-
-            return;
-          }
-
-          await supabase.auth.updateUser(
-            {
-              data: {
-                username,
-                display_name:
-                  displayName ||
-                  username
-              }
-            }
-          );
-
-          text(
-            "account-status",
-            "Account updated."
-          );
-
-          await initAuth();
-        }
-      );
-
-    el("logout-button")
-      ?.addEventListener(
-        "click",
-        async () => {
-
-          await supabase.auth.signOut();
-
-          location.href =
-            "index.html";
-        }
-      );
-  }
-
-  async function setupCreateTopicPage() {
-
-    await initAuth();
-
-    if (!currentUser) {
-
-      location.href =
-        "login.html";
-
-      return;
-    }
-
-    const count =
-      await supabase.rpc(
-        "get_general_note_count",
-        {
-          p_user_id:
-            currentUser.id
-        }
-      );
-
-    if (
-      count.error ||
-      Number(count.data || 0) < 20
-    ) {
-
-      text(
-        "topic-status",
-        "You need at least 20 GENERAL notes before creating a topic."
-      );
-
-      return;
-    }
-
-    el("topic-form")
-      ?.addEventListener(
-        "submit",
-        async (event) => {
-
-          event.preventDefault();
-
-          const name =
-            el("topic-name")
-              ?.value.trim() || "";
-
-          const description =
-            el("topic-description")
-              ?.value.trim() || "";
-
-          if (
-            !name ||
-            name.length > 120
-          ) {
-
-            text(
-              "topic-status",
-              "Enter a valid topic name."
-            );
-
-            return;
-          }
-
-          const r =
-            await supabase
-              .from("topics")
-              .insert({
-                name,
-                description,
-                owner_id:
-                  currentUser.id
-              })
-              .select("id")
-              .single();
-
-          if (r.error) {
-
-            text(
-              "topic-status",
-              r.error.message
-            );
-
-            return;
-          }
-
-          location.href =
-            `topic.html?id=${encodeURIComponent(
-              r.data.id
-            )}`;
-        }
-      );
-  }
-
-  async function setupIndexPage() {
-
-    setupDrawer();
-
-    await initAuth();
-
-    await loadTopics();
-
-    await loadProgress();
-
-    const topic =
-      await getTopic(
-        query("id") ||
-        "general"
-      );
-
-    if (!topic) {
-      return;
-    }
-
-    const write =
-      el("write-button");
-
-    if (write) {
-
-      const allowed =
-        topic.isGeneral
-          ? !!currentUser
-          : !!currentUser &&
-            currentUser.id ===
-              topic.owner_id;
-
-      write.style.display =
-        allowed
-          ? "inline-flex"
-          : "none";
-    }
-  }
-
-  async function setupReadPage() {
-
-    setupDrawer();
-
-    await initAuth();
-
-    await loadTopics();
-
-    await loadSingleNote();
-  }
-
-  async function boot() {
-
-    if (page === "index") {
-      await setupIndexPage();
-      return;
-    }
-
-    if (page === "topic") {
-      await loadTopicPage();
-      return;
-    }
-
-    if (page === "note") {
-      await setupReadPage();
-      return;
-    }
-
-    if (page === "write") {
-      await setupWriter(false);
-      return;
-    }
-
-    if (page === "edit-note") {
-      await setupWriter(true);
-      return;
-    }
-
-    if (page === "login") {
-      await setupAuthPage();
-      return;
-    }
-
-    if (page === "register") {
-      await setupAuthPage();
-      return;
-    }
-
-    if (page === "account") {
-      await setupAccountPage();
-      return;
-    }
-
-    if (page === "create-topic") {
-      await setupCreateTopicPage();
-      return;
-    }
-
-  }
-
-  boot();
-
-})();
-        }`
-            : ""
-        }
-
-      </div>
-    `;
-
-    await loadComments(id);
-  }
-
-  function renderOwner(topic) {
-
-    const panel =
-      el("owner-panel");
-
-    if (!panel) {
-      return;
-    }
-
-    if (
-      topic.isGeneral
-    ) {
-
-      panel.innerHTML = `
-        <div class="owner-title">
-          OWNER
-        </div>
-
-        <div class="owner-badge">
-          <span>◯</span>
-        </div>
-
-        <div class="owner-name">
-          PUBLIC NOTEBOOK
-        </div>
-
-        <p class="owner-bio">
-          This is the public GENERAL
-          notebook.
-        </p>
-      `;
-
-      return;
-    }
-
-    const profile =
-      topic.profiles || {};
-
-    panel.innerHTML = `
-      <div class="owner-title">
-        OWNER
-      </div>
-
-      <div class="owner-badge">
-
-        ${
-          profile.avatar_url
-            ? `
-              <img
-                src="${esc(
-                  profile.avatar_url
-                )}"
-                alt=""
-              >
-            `
-            : `
-              <span>◯</span>
-            `
-        }
-
-      </div>
-
-      <div class="owner-name">
-        @${esc(
-          profile.username ||
-          "user"
-        )}
-      </div>
-
-      ${
-        profile.display_name
-          ? `
-            <div class="owner-display-name">
-              ${esc(
-                profile.display_name
-              )}
-            </div>
-          `
-          : ""
-      }
-
-      <p class="owner-bio">
-        ${esc(
-          profile.bio ||
-          "No bio yet."
-        )}
-      </p>
-    `;
-  }
-
-  async function setupWriter(
-    edit = false
-  ) {
-
-    await initAuth();
-
-    if (!currentUser) {
-
-      location.href =
-        "login.html";
-
-      return;
-    }
-
-    setupDrawer();
-
-    await loadTopics();
-
-    const topicId =
-      query("topic") ||
-      query("topic_id") ||
-      "general";
-
-    const topic =
-      await getTopic(topicId);
-
-    if (!topic) {
-
-      text(
-        "write-status",
-        "Topic not found."
-      );
-
-      return;
-    }
-
-    /*
-      GENERAL notes can be created by
-      authenticated users.
-
-      Notes in personal/community topics
-      can only be created by the topic owner.
-    */
-
-    if (
-      !topic.isGeneral &&
-      topic.owner_id !==
-        currentUser.id
-    ) {
-
-      text(
-        "write-status",
-        "Only the topic owner can post notes here."
-      );
-
-      return;
-    }
-
-    const title =
-      el("note-title");
-
-    const editor =
-      el("note-editor");
-
-    if (!title || !editor) {
-      return;
-    }
-
-    text(
-      "writer-topic",
-      topic.name
-    );
-
     let noteId = null;
 
     if (edit) {
-
-      noteId =
-        query("id");
+      noteId = query("id");
 
       const r =
         await supabase
@@ -2013,10 +911,7 @@
           .select(
             "id,title,content,topic_id,author_id"
           )
-          .eq(
-            "id",
-            noteId
-          )
+          .eq("id", noteId)
           .maybeSingle();
 
       if (
@@ -2025,7 +920,6 @@
         r.data.author_id !==
           currentUser.id
       ) {
-
         text(
           "write-status",
           "You cannot edit this note."
@@ -2045,7 +939,6 @@
         t.owner_id !==
           currentUser.id
       ) {
-
         text(
           "write-status",
           "GENERAL notes cannot be edited."
@@ -2072,7 +965,6 @@
       .addEventListener(
         "click",
         async () => {
-
           const cleanTitle =
             title.value.trim();
 
@@ -2086,7 +978,6 @@
             !cleanTitle ||
             !body
           ) {
-
             text(
               "write-status",
               "Title and note content are required."
@@ -2101,7 +992,6 @@
             body.length >
               MAX_CONTENT
           ) {
-
             text(
               "write-status",
               "Your note is too long."
@@ -2127,7 +1017,6 @@
           let r;
 
           if (edit) {
-
             /*
               Editing is only possible for
               notes in user-created topics.
@@ -2139,13 +1028,10 @@
                 .update({
                   title:
                     cleanTitle,
-
                   content:
                     clean,
-
                   updated_at:
-                    new Date()
-                      .toISOString()
+                    new Date().toISOString()
                 })
                 .eq(
                   "id",
@@ -2155,7 +1041,6 @@
                 .single();
 
           } else {
-
             /*
               IMPORTANT RLS FIX
 
@@ -2178,7 +1063,6 @@
               await supabase
                 .from("notes")
                 .insert({
-
                   topic_id:
                     topic.isGeneral
                       ? null
@@ -2192,14 +1076,12 @@
 
                   content:
                     clean
-
                 })
                 .select("id")
                 .single();
           }
 
           if (r.error) {
-
             text(
               "write-status",
               r.error.message
@@ -2216,589 +1098,135 @@
             `note.html?id=${encodeURIComponent(
               r.data.id
             )}`;
-
         }
       );
   }
 
+  async function loadSingleNote() {
+    setupDrawer();
 
-  function commentDate(v) {
+    await initAuth();
+    await loadTopics();
+    await loadProgress();
 
-    return new Date(v)
-      .toLocaleDateString(
-        undefined,
-        {
-          year: "numeric",
-          month: "short",
-          day: "numeric"
-        }
+    const id =
+      query("id");
+
+    if (!id) {
+      text(
+        "note",
+        "No note specified."
       );
-  }
 
-
-  async function loadComments(
-    noteId
-  ) {
-
-    const list =
-      el("comments-list");
-
-    const form =
-      el("comment-form");
-
-    const input =
-      el("comment-input");
-
-    const counter =
-      el("comment-counter");
-
-    const button =
-      el("post-comment-button");
-
-    const status =
-      el("comment-status");
-
-    if (!list) {
       return;
     }
-
-    const refreshControls =
-      () => {
-
-        if (
-          !input ||
-          !counter ||
-          !button
-        ) {
-          return;
-        }
-
-        const count =
-          input.value
-            .trim()
-            .length;
-
-        counter.textContent =
-          `${count} / 100 characters minimum`;
-
-        button.disabled =
-          !currentUser ||
-          count < 100;
-      };
-
-
-    if (!currentUser) {
-
-      if (form) {
-
-        form.innerHTML = `
-          <div class="comment-login-note">
-
-            <span>
-              Sign in to leave a comment.
-            </span>
-
-            <a
-              class="action-button blue"
-              href="login.html"
-            >
-              LOGIN
-            </a>
-
-          </div>
-        `;
-
-      }
-
-    } else if (
-      input &&
-      counter &&
-      button
-    ) {
-
-      input.addEventListener(
-        "input",
-        refreshControls
-      );
-
-      refreshControls();
-
-
-      button.addEventListener(
-        "click",
-        async () => {
-
-          const content =
-            input.value.trim();
-
-
-          if (
-            content.length < 100
-          ) {
-
-            if (status) {
-
-              status.textContent =
-                "Your comment must contain at least 100 characters.";
-
-            }
-
-            refreshControls();
-
-            return;
-          }
-
-
-          if (
-            content.length > 2000
-          ) {
-
-            if (status) {
-
-              status.textContent =
-                "Your comment cannot exceed 2,000 characters.";
-
-            }
-
-            return;
-          }
-
-
-          button.disabled =
-            true;
-
-          if (status) {
-
-            status.textContent =
-              "Posting comment.";
-
-          }
-
-
-          const r =
-            await supabase
-              .from("comments")
-              .insert({
-
-                note_id:
-                  noteId,
-
-                author_id:
-                  currentUser.id,
-
-                content:
-                  content
-
-              });
-
-
-          if (r.error) {
-
-            if (status) {
-
-              status.textContent =
-                r.error.message;
-
-            }
-
-            refreshControls();
-
-            return;
-          }
-
-
-          input.value = "";
-
-          if (status) {
-
-            status.textContent =
-              "Comment posted.";
-
-          }
-
-          refreshControls();
-
-          await renderComments(
-            noteId
-          );
-
-        }
-      );
-
-    }
-
-
-    await renderComments(
-      noteId
-    );
-  }
-
-
-  async function renderComments(
-    noteId
-  ) {
-
-    const list =
-      el("comments-list");
-
-    if (!list) {
-      return;
-    }
-
 
     const r =
       await supabase
-        .from("comments")
+        .from("notes")
         .select(
-          "id,content,created_at,author_id,profiles(username,display_name)"
+          "id,topic_id,author_id,title,content,created_at,updated_at,profiles(username,display_name)"
         )
-        .eq(
-          "note_id",
-          noteId
-        )
-        .order(
-          "created_at",
-          {
-            ascending: true
-          }
-        );
-
-
-    if (r.error) {
-
-      list.innerHTML = `
-        <p class="comment-empty">
-          Could not load comments:
-          ${esc(
-            r.error.message
-          )}
-        </p>
-      `;
-
-      return;
-    }
-
+        .eq("id", id)
+        .maybeSingle();
 
     if (
-      !r.data?.length
+      r.error ||
+      !r.data
     ) {
-
-      list.innerHTML = `
-        <p class="comment-empty">
-          No comments yet.
-          Be the first to leave a thoughtful note.
-        </p>
-      `;
+      text(
+        "note",
+        "This note could not be found."
+      );
 
       return;
     }
 
+    const topic =
+      await getTopic(
+        r.data.topic_id
+      );
 
-    list.innerHTML =
-      r.data
-        .map(
-          (comment) => {
-
-            const username =
-              comment.profiles
-                ?.username ||
-              "user";
-
-            return `
-              <article
-                class="comment-entry"
-              >
-
-                <span
-                  class="comment-author"
-                >
-                  @${esc(
-                    username
-                  )}
-                </span>
-
-                <span
-                  class="comment-date"
-                >
-                  (${esc(
-                    commentDate(
-                      comment.created_at
-                    )
-                  )})
-                </span>:
-
-                <span
-                  class="comment-text"
-                >
-                  ${esc(
-                    comment.content
-                  )}
-                </span>
-
-              </article>
-            `;
-
-          }
-        )
-        .join("");
-  }
-
-
-  async function setupAuthPage() {
-
-    const mode =
-      document.body
-        .dataset
-        .authMode;
-
-    if (!mode) {
-      return;
-    }
-
-
-    await initAuth();
-
-
-    const form =
-      el("auth-form");
-
-    if (!form) {
-      return;
-    }
-
-
-    if (
-      currentUser &&
-      (
-        mode === "login" ||
-        mode === "register"
-      )
-    ) {
-
-      location.href =
-        "index.html";
+    if (!topic) {
+      text(
+        "note",
+        "The note's topic could not be found."
+      );
 
       return;
     }
 
-
-    form.addEventListener(
-      "submit",
-      async (event) => {
-
-        event.preventDefault();
-
-
-        const email =
-          el("email")
-            ?.value
-            .trim() ||
-          "";
-
-        const password =
-          el("password")
-            ?.value ||
-          "";
-
-        const username =
-          el("username")
-            ?.value
-            .trim() ||
-          "";
-
-        const displayName =
-          el("display-name")
-            ?.value
-            .trim() ||
-          "";
-
-
-        text(
-          "auth-status",
-          ""
-        );
-
-
-        if (
-          !email ||
-          !password
-        ) {
-
-          text(
-            "auth-status",
-            "Email and password are required."
-          );
-
-          return;
-        }
-
-
-        const button =
-          form.querySelector(
-            "button[type='submit']"
-          );
-
-
-        if (button) {
-          button.disabled =
-            true;
-        }
-
-
-        if (
-          mode === "login"
-        ) {
-
-          const r =
-            await supabase
-              .auth
-              .signInWithPassword({
-                email,
-                password
-              });
-
-
-          if (r.error) {
-
-            text(
-              "auth-status",
-              r.error.message
-            );
-
-            if (button) {
-              button.disabled =
-                false;
-            }
-
-            return;
-          }
-
-
-          location.href =
-            "index.html";
-
-          return;
-        }
-
-
-        if (
-          mode === "register"
-        ) {
-
-          if (
-            !username ||
-            username.length < 3
-          ) {
-
-            text(
-              "auth-status",
-              "Username must be at least 3 characters."
-            );
-
-            if (button) {
-              button.disabled =
-                false;
-            }
-
-            return;
-          }
-
-
-          const r =
-            await supabase
-              .auth
-              .signUp({
-
-                email,
-
-                password,
-
-                options: {
-
-                  data: {
-
-                    username,
-
-                    display_name:
-                      displayName ||
-                      username
-
-                  }
-
-                }
-
-              });
-
-
-          if (r.error) {
-
-            text(
-              "auth-status",
-              r.error.message
-            );
-
-            if (button) {
-              button.disabled =
-                false;
-            }
-
-            return;
-          }
-
-
-          /*
-            Email confirmation is intentionally
-            not required by the application UI.
-
-            If Supabase's "Confirm email" setting
-            is disabled, signUp() returns an
-            active session.
-          */
-
-
-          if (
-            r.data.session
-          ) {
-
-            text(
-              "auth-status",
-              "Account created! You can now use your notebook."
-            );
-
-
-            setTimeout(
-              () => {
-
-                location.href =
-                  "index.html";
-
-              },
-              700
-            );
-
-
-          } else {
-
-            text(
-              "auth-status",
-              "Account created! You can now use your notebook."
-            );
-
-
-            if (button) {
-
-              button.disabled =
-                false;
-
-            }
-
-          }
-
-        }
-
-      }
+    text(
+      "owner-panel",
+      ""
     );
-  }
+
+    renderOwner(topic);
+
+    el(
+      "back-topic"
+    ).href =
+      `topic.html?id=${encodeURIComponent(
+        topic.isGeneral
+          ? "general"
+          : topic.id
+      )}`;
+
+    const owner =
+      topic.isGeneral
+        ? "Anonymous"
+        : r.data.profiles
+            ?.display_name ||
+          r.data.profiles
+            ?.username ||
+          "User";
+
+    const manage =
+      !topic.isGeneral &&
+      currentUser &&
+      currentUser.id ===
+        r.data.author_id &&
+      currentUser.id ===
+        topic.owner_id;
+
+    el("note").innerHTML = `
+      <div class="note-meta">
+        Posted:
+        ${esc(
+          date(r.data.created_at)
+        )}
+      </div>
+
+      <div class="note-author">
+        ${esc(owner)}
+      </div>
+
+      <h1>
+        ${esc(r.data.title)}
+      </h1>
+
+      <hr>
+
+      <div class="note-content">
+        ${safeHtml(
+          r.data.content
+        )}
+      </div>
+
+      <div class="note-bottom">
+
+        ${
+          manage
+            ? `
+              <a
+                class="edit-link"
+                href="edit-note.html?id=${encodeURIComponent(
+                  r.data.id
+                )}"
+              >
+                EDIT NOTE
+              </a>
+
               <button
                 class="delete-link"
                 id="single-delete"
@@ -2846,8 +1274,6 @@
         }
       }
     );
-
-    await loadComments(id);
   }
 
   async function setupAuth(
