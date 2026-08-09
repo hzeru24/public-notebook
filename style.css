@@ -483,9 +483,10 @@ button,input,textarea{font-family:inherit}
 }
 
 .owner-badge img {
-  width: 70%;
-  height: 70%;
+  width: 100%;
+  height: 100%;
   object-fit: contain;
+  object-position: center;
 }
 
 .info-panel #owner-panel:before{
