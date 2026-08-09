@@ -8,7 +8,9 @@
   --paper-warm:#f6f0e4;
   --page:#e9e1d2;
   --page-dark:#ddd3c1;
-  --line:rgba(112,94,69,.18);
+  --line:rgba(112,94,69,.18);<div class="owner-badge">
+  <img src="assets/logo.png" alt="Public Notebook">
+</div>
   --terracotta:#b85f4d;
   --terracotta-dark:#9e4e40;
   --sage:#526b56;
@@ -468,26 +470,26 @@ button,input,textarea{font-family:inherit}
 
 .compact{padding:10px 0}
 
-.owner-avatar,.owner-badge{
-  width:58px;
-  height:58px;
-  border-radius:50%;
-  border:1px solid rgba(45,41,36,.16);
-  background:var(--paper);
-  color:var(--terracotta-dark);
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  font-size:23px;
-  font-weight:700;
-  margin:0 0 13px;
-  box-shadow:0 4px 12px rgba(66,53,36,.08);
+.owner-avatar,.owner-badge {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: #55745d;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 16px;
+  overflow: hidden;
 }
 
-.owner-badge{background:var(--sage);color:#fff}
+.owner-badge img {
+  width: 70%;
+  height: 70%;
+  object-fit: contain;
+}
 
 .info-panel #owner-panel:before{
-  content:"OWNER";
+  content:"RPNZL";
   display:block;
   color:var(--muted);
   font-size:9px;
