@@ -624,7 +624,6 @@ button,input,textarea{font-family:inherit}
   padding-top:16px;
   font-weight:700;
 }
-
 .writer-page,.form-page,.auth-page{
   max-width:850px;
   margin:38px auto;
@@ -802,6 +801,238 @@ button,input,textarea{font-family:inherit}
   display:none;
 }
 
+
+/* =========================================================
+   COMMENTS
+   ========================================================= */
+
+.comments-section{
+  margin-top:38px;
+  padding-top:25px;
+  border-top:1px solid rgba(66,53,36,.18);
+}
+
+.comments-heading{
+  font-size:11px;
+  letter-spacing:2px;
+  font-weight:700;
+  color:var(--muted);
+  margin-bottom:18px;
+}
+
+.comments-list{
+  display:flex;
+  flex-direction:column;
+  width:100%;
+}
+
+.comment-entry{
+  padding:14px 0;
+  border-bottom:1px solid rgba(66,53,36,.13);
+  color:var(--ink-soft);
+  font-size:14px;
+  line-height:1.65;
+}
+
+.comment-entry:first-child{
+  padding-top:0;
+}
+
+.comment-author{
+  color:var(--terracotta-dark);
+  font-weight:700;
+}
+
+.comment-date{
+  color:var(--muted);
+  font-size:11px;
+  margin-left:4px;
+}
+
+.comment-text{
+  color:var(--ink-soft);
+}
+
+.comment-empty{
+  padding:5px 0 18px;
+  color:var(--muted);
+  font-size:13px;
+  font-style:italic;
+}
+
+
+/* ---------------------------------------------------------
+   COMMENT FORM
+   --------------------------------------------------------- */
+
+.comment-form{
+  margin-top:25px;
+  padding-top:22px;
+  border-top:1px solid rgba(66,53,36,.18);
+}
+
+.comment-input{
+  display:block;
+  width:100%;
+  min-height:135px;
+  resize:vertical;
+  border:1px solid rgba(45,41,36,.2);
+  border-radius:2px;
+  background:#fffdf6;
+  color:var(--ink);
+  padding:14px 15px;
+  outline:none;
+  font-family:Georgia,"Times New Roman",serif;
+  font-size:15px;
+  line-height:1.7;
+
+  background-image:
+    repeating-linear-gradient(
+      to bottom,
+      transparent 0,
+      transparent 26px,
+      rgba(112,94,69,.12) 27px,
+      transparent 28px
+    );
+}
+
+.comment-input:focus{
+  border-color:var(--sage);
+  box-shadow:0 0 0 3px rgba(82,107,86,.08);
+}
+
+.comment-input::placeholder{
+  color:rgba(102,93,83,.58);
+  font-style:italic;
+}
+
+.comment-form-bottom{
+  display:flex;
+  justify-content:flex-end;
+  align-items:center;
+  gap:18px;
+  margin-top:9px;
+}
+
+.comment-counter{
+  margin-right:auto;
+  color:var(--muted);
+  font-size:10px;
+  letter-spacing:.4px;
+}
+
+.comment-status{
+  min-height:16px;
+  margin-top:7px;
+  color:var(--terracotta-dark);
+  font-size:11px;
+}
+
+#post-comment-button{
+  border:1px solid transparent;
+  background:var(--sage);
+  color:#fff;
+  border-radius:999px;
+  padding:11px 18px;
+  font-size:10px;
+  letter-spacing:1.2px;
+  font-weight:700;
+  cursor:pointer;
+  transition:.18s ease;
+}
+
+#post-comment-button:hover{
+  background:var(--sage-dark);
+  transform:translateY(-1px);
+}
+
+#post-comment-button:disabled{
+  opacity:.4;
+  cursor:not-allowed;
+  transform:none;
+}
+
+
+/* ---------------------------------------------------------
+   LOGIN MESSAGE FOR COMMENTS
+   --------------------------------------------------------- */
+
+.comment-login-note{
+  margin-top:22px;
+  padding:17px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:15px;
+  background:var(--paper-warm);
+  border:1px solid rgba(66,53,36,.13);
+  color:var(--ink-soft);
+  font-size:13px;
+  line-height:1.5;
+}
+
+
+/* ---------------------------------------------------------
+   COMMENT DIVIDER / JOURNAL STYLE
+   --------------------------------------------------------- */
+
+.comments-section:before{
+  content:"";
+  display:block;
+  width:100%;
+  height:1px;
+  background:rgba(66,53,36,.05);
+  margin-bottom:22px;
+}
+
+
+/* =========================================================
+   FOOTER
+   ========================================================= */
+
+.footer{
+  max-width:1500px;
+  margin:0 auto;
+  border-top:1px solid rgba(66,53,36,.15);
+  padding:22px 25px;
+  text-align:center;
+  color:var(--muted);
+  font-size:11px;
+  background:rgba(236,227,212,.5);
+}
+
+.footer a{
+  color:var(--terracotta-dark);
+  text-decoration:none;
+  font-weight:700;
+}
+
+
+/* =========================================================
+   UTILITY
+   ========================================================= */
+
+.hidden{
+  display:none!important;
+}
+
+.center{
+  text-align:center;
+}
+
+.error{
+  color:var(--terracotta-dark);
+}
+
+.success{
+  color:var(--sage-dark);
+}
+
+
+/* =========================================================
+   TABLET
+   ========================================================= */
+
 @media(max-width:1050px){
 
   .layout{
@@ -813,6 +1044,11 @@ button,input,textarea{font-family:inherit}
   }
 
 }
+
+
+/* =========================================================
+   MOBILE
+   ========================================================= */
 
 @media(max-width:760px){
 
@@ -942,7 +1178,65 @@ button,input,textarea{font-family:inherit}
     min-height:55vh;
   }
 
+
+  /* -------------------------------------------------------
+     MOBILE COMMENTS
+     ------------------------------------------------------- */
+
+  .comments-section{
+    margin-top:30px;
+    padding-top:20px;
+  }
+
+  .comments-heading{
+    margin-bottom:15px;
+  }
+
+  .comment-entry{
+    font-size:13px;
+    padding:13px 0;
+  }
+
+  .comment-date{
+    font-size:10px;
+  }
+
+  .comment-input{
+    min-height:140px;
+    font-size:14px;
+  }
+
+  .comment-form-bottom{
+    display:flex;
+    flex-direction:column;
+    align-items:stretch;
+    gap:8px;
+  }
+
+  .comment-counter{
+    margin-right:0;
+    text-align:right;
+  }
+
+  #post-comment-button{
+    width:100%;
+  }
+
+  .comment-login-note{
+    display:block;
+  }
+
+  .comment-login-note .action-button{
+    width:100%;
+    margin-top:12px;
+  }
+
 }
+
+
+/* =========================================================
+   REDUCED MOTION
+   ========================================================= */
 
 @media(prefers-reduced-motion:reduce){
 
