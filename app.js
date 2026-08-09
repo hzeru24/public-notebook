@@ -650,8 +650,8 @@
     if (topic.isGeneral) {
       panel.innerHTML = `
         <div class="owner-badge">
-          ★
-        </div>
+  <img src="assets/logo.png" alt="Public Notebook">
+</div>
 
         <h2>GENERAL</h2>
 
