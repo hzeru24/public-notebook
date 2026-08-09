@@ -1,6 +1,0 @@
-Registration message update
-
-The registration success message now reads:
-“Account created! You can now use your notebook.”
-
-Important: Supabase email confirmation is controlled by the Supabase Dashboard. To prevent verification emails and allow immediate login, disable “Confirm email” under Authentication → Providers → Email in the Supabase project.
